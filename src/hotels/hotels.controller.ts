@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { HotelsService } from './hotels.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
+import { GetHotelsFilterDto } from './dto/get-hotels-filter.dto';
 
 @Controller('hotels')
 export class HotelsController {
@@ -20,8 +21,19 @@ export class HotelsController {
   }
 
   @Get()
-  getHotels() {
-    return this.hotelsService.findAll();
+  getHotels(
+    @Query('search') search?: string,
+    @Query('country') country?: string,
+    @Query('minRating') minRating?: string,
+    @Query('maxPrice') maxPrice?: string,
+  ) {
+    const filterDto: GetHotelsFilterDto = {
+      search,
+      country,
+      minRating: minRating ? parseInt(minRating, 10) : undefined,
+      maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
+    };
+    return this.hotelsService.findAll(filterDto);
   }
 
   @Get(':id')

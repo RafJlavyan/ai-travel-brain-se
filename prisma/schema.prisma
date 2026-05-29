@@ -21,6 +21,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   reviews HotelReviews[]
+  likes   ReviewLike[]
 }
 
 model Hotel {
@@ -50,6 +51,18 @@ model HotelReviews {
 
   hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes ReviewLike[] 
 
   @@unique([hotelId, userId])
+}
+
+model ReviewLike {
+  id       Int @id @default(autoincrement())
+  reviewId Int
+  userId   Int
+
+  review HotelReviews @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, userId])
 }

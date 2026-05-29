@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { GetHotelsFilterDto } from './dto/get-hotels-filter.dto';
 
 @Injectable()
 export class HotelsService {
@@ -10,8 +12,35 @@ export class HotelsService {
     return this.prisma.hotel.create({ data });
   }
 
-  async findAll() {
+  async findAll(filterDto: GetHotelsFilterDto) {
+    const { country, search, minRating, maxPrice } = filterDto;
+    const where: Prisma.HotelWhereInput = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+        { country: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (country) {
+      where.country = {
+        equals: country,
+        mode: 'insensitive',
+      };
+    }
+
+    if (minRating) {
+      where.stars = { gte: minRating };
+    }
+
+    if (maxPrice) {
+      where.pricePerNight = { lte: maxPrice };
+    }
+
     return await this.prisma.hotel.findMany({
+      where,
       orderBy: {
         updatedAt: 'desc',
       },
@@ -35,27 +64,53 @@ export class HotelsService {
     return hotel;
   }
 
-  async findReviews(hotelId: number, page: number = 1, limit: number = 5) {
+  async findReviews(
+    hotelId: number,
+    page: number = 1,
+    limit: number = 5,
+    currentUserId?: number,
+  ) {
     const skip = (page - 1) * limit;
 
-    // Run parallel database queries for optimal performance
-    const [reviews, totalCount] = await Promise.all([
-      this.prisma.hotelReviews.findMany({
+    // 2. Explicitly type the shape of the query to match your exact include parameters
+    const reviewWithRelationsArgs =
+      Prisma.validator<Prisma.HotelReviewsFindManyArgs>()({
         where: { hotelId },
         skip: skip,
-        take: limit, // Only fetches 5 reviews at a time
+        take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
           user: {
             select: { firstName: true, lastName: true, email: true },
           },
+          likes: currentUserId
+            ? { where: { userId: currentUserId }, select: { id: true } }
+            : false,
+          _count: {
+            select: { likes: true },
+          },
         },
-      }),
+      });
+
+    // 3. Force TypeScript to enforce the exact nested model properties inside Promise.all
+    const [reviews, totalCount] = await Promise.all([
+      this.prisma.hotelReviews.findMany(reviewWithRelationsArgs),
       this.prisma.hotelReviews.count({ where: { hotelId } }),
     ]);
 
+    // 4. Map entries safely. TypeScript will now accurately autocomplete 'user', '_count', and 'likes'!
+    const formattedReviews = reviews.map((review) => ({
+      id: review.id,
+      rating: review.rating,
+      review: review.review,
+      createdAt: review.createdAt,
+      user: review.user,
+      likesCount: review._count?.likes ?? 0,
+      isLiked: Array.isArray(review.likes) ? review.likes.length > 0 : false,
+    }));
+
     return {
-      data: reviews,
+      data: formattedReviews,
       meta: {
         total: totalCount,
         page,

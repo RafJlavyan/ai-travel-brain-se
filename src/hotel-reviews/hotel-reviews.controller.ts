@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get } from '@nestjs/common';
 import { HotelReviewsService } from './hotel-reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 
