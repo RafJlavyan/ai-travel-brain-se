@@ -52,6 +52,33 @@ export class HotelsService {
     });
   }
 
+  async getSuggestions(searchQuery: string) {
+    const matches = await this.prisma.hotel.findMany({
+      where: {
+        OR: [
+          { name: { startsWith: searchQuery, mode: 'insensitive' } },
+          { city: { startsWith: searchQuery, mode: 'insensitive' } },
+          { country: { startsWith: searchQuery, mode: 'insensitive' } },
+        ],
+      },
+      select: { name: true, city: true, country: true },
+      take: 5,
+    });
+
+    const suggestions = new Set<string>();
+
+    matches.forEach((hotel) => {
+      if (hotel.name.toLowerCase().startsWith(searchQuery.toLowerCase()))
+        suggestions.add(hotel.name);
+      if (hotel.city.toLowerCase().startsWith(searchQuery.toLowerCase()))
+        suggestions.add(hotel.city);
+      if (hotel.country.toLowerCase().startsWith(searchQuery.toLowerCase()))
+        suggestions.add(hotel.country);
+    });
+
+    return Array.from(suggestions);
+  }
+
   async findOne(id: number) {
     const hotel = await this.prisma.hotel.findUnique({
       where: { id },

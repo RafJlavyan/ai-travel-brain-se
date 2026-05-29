@@ -36,6 +36,12 @@ export class HotelsController {
     return this.hotelsService.findAll(filterDto);
   }
 
+  @Get('autocomplete')
+  async autocomplete(@Query('q') query?: string) {
+    if (!query || query.trim().length < 2) return [];
+    return this.hotelsService.getSuggestions(query);
+  }
+
   @Get(':id')
   getHotelById(@Param('id', ParseIntPipe) id: number) {
     return this.hotelsService.findOne(id);
