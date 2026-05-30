@@ -11,6 +11,10 @@ import { HotelsService } from './hotels.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { GetHotelsFilterDto } from './dto/get-hotels-filter.dto';
 
+interface SaveSearchHistoryBody {
+  query?: string;
+}
+
 @Controller('hotels')
 export class HotelsController {
   constructor(private readonly hotelsService: HotelsService) {}
@@ -40,6 +44,16 @@ export class HotelsController {
   async autocomplete(@Query('q') query?: string) {
     if (!query || query.trim().length < 2) return [];
     return this.hotelsService.getSuggestions(query);
+  }
+
+  @Get('search-history/recent')
+  getRecentSearches() {
+    return this.hotelsService.getRecentSearches();
+  }
+
+  @Post('search-history')
+  saveSearchHistory(@Body() body: SaveSearchHistoryBody) {
+    return this.hotelsService.saveSearchHistory(body.query);
   }
 
   @Get(':id')

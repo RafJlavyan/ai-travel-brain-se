@@ -79,6 +79,74 @@ export class HotelsService {
     return Array.from(suggestions);
   }
 
+  // FIXED: Added transaction isolation and fixed array index property reading crash bug
+  async saveSearchHistory(searchQuery?: string) {
+    const query = searchQuery?.trim();
+    if (!query) return null;
+
+    const matchedHotel = await this.prisma.hotel.findFirst({
+      where: { name: { equals: query, mode: 'insensitive' } },
+      select: { id: true },
+    });
+
+    // Run actions together inside a atomic transaction context
+    return this.prisma.$transaction(async (tx) => {
+      const newSearch = await tx.hotelSearchHistory.create({
+        data: {
+          query,
+          hotelId: matchedHotel?.id ?? null,
+        },
+        include: { hotel: true },
+      });
+
+      const fifthRecord = await tx.hotelSearchHistory.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: 4,
+        take: 1,
+        select: { createdAt: true },
+      });
+
+      // CRITICAL FIX: Evaluated array elements safely via index boundaries [0]
+      if (fifthRecord.length > 0) {
+        await tx.hotelSearchHistory.deleteMany({
+          where: {
+            createdAt: {
+              lt: fifthRecord[0].createdAt,
+            },
+          },
+        });
+      }
+
+      return newSearch;
+    });
+  }
+
+  async getRecentSearches(limit: number = 6) {
+    const searches = await this.prisma.hotelSearchHistory.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit * 4,
+      include: {
+        hotel: true,
+      },
+    });
+
+    const seenQueries = new Set<string>();
+    const recentSearches = searches.filter((search) => {
+      const normalizedQuery = search.query.trim().toLowerCase();
+
+      if (seenQueries.has(normalizedQuery)) {
+        return false;
+      }
+
+      seenQueries.add(normalizedQuery);
+      return true;
+    });
+
+    return recentSearches.slice(0, limit);
+  }
+
   async findOne(id: number) {
     const hotel = await this.prisma.hotel.findUnique({
       where: { id },
@@ -99,7 +167,6 @@ export class HotelsService {
   ) {
     const skip = (page - 1) * limit;
 
-    // 2. Explicitly type the shape of the query to match your exact include parameters
     const reviewWithRelationsArgs =
       Prisma.validator<Prisma.HotelReviewsFindManyArgs>()({
         where: { hotelId },
@@ -119,13 +186,11 @@ export class HotelsService {
         },
       });
 
-    // 3. Force TypeScript to enforce the exact nested model properties inside Promise.all
     const [reviews, totalCount] = await Promise.all([
       this.prisma.hotelReviews.findMany(reviewWithRelationsArgs),
       this.prisma.hotelReviews.count({ where: { hotelId } }),
     ]);
 
-    // 4. Map entries safely. TypeScript will now accurately autocomplete 'user', '_count', and 'likes'!
     const formattedReviews = reviews.map((review) => ({
       id: review.id,
       rating: review.rating,
