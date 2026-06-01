@@ -210,4 +210,43 @@ export class HotelsService {
       },
     };
   }
+
+  async getRecommendations(userId: number, limit: number = 5) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        preferredClimate: true,
+        travelStyle: true,
+        preferredActivities: true,
+        budgetRange: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User profile not found');
+    }
+
+    return this.prisma.hotel.findMany({
+      where: {
+        OR: [
+          {
+            tags: {
+              hasSome: user.preferredActivities,
+            },
+          },
+          {
+            description: {
+              contains: user.travelStyle ?? '',
+              mode: 'insensitive',
+            },
+          },
+          {
+            stars: user.budgetRange === 'LUXURY' ? { gte: 4 } : { lte: 4 },
+          },
+        ],
+      },
+      orderBy: [{ stars: 'desc' }, { updatedAt: 'desc' }],
+      take: limit,
+    });
+  }
 }

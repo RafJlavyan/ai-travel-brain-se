@@ -13,12 +13,13 @@ export async function seedUsers(prisma: PrismaClient) {
       firstName: firstName,
       lastName: lastName,
       email: faker.internet.email({ firstName, lastName }).toLowerCase(),
+      password: faker.internet.password(),
     };
   });
 
   const createdUsers = await prisma.user.createMany({
     data: usersData,
-    skipDuplicates: true, // Prevents crashes if an email collision occurs
+    skipDuplicates: true,
   });
 
   console.log(`✅ Successfully seeded ${createdUsers.count} users!`);

@@ -2,14 +2,20 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { HotelsService } from './hotels.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { GetHotelsFilterDto } from './dto/get-hotels-filter.dto';
+import { JwtGuard } from 'src/auth/guards/jwt.guard';
+import { GetUser } from 'src/auth/decorators/get-user.decorator';
+import type { JwtPayload } from 'src/auth/types/auth.types';
+import { RecommendationQueryDto } from './dto/recommendation-query.dto';
 
 interface SaveSearchHistoryBody {
   query?: string;
@@ -19,6 +25,7 @@ interface SaveSearchHistoryBody {
 export class HotelsController {
   constructor(private readonly hotelsService: HotelsService) {}
 
+  @UseGuards(JwtGuard)
   @Post()
   create(@Body() createHotelDto: CreateHotelDto) {
     return this.hotelsService.create(createHotelDto);
@@ -46,11 +53,13 @@ export class HotelsController {
     return this.hotelsService.getSuggestions(query);
   }
 
+  @UseGuards(JwtGuard)
   @Get('search-history/recent')
   getRecentSearches() {
     return this.hotelsService.getRecentSearches();
   }
 
+  @UseGuards(JwtGuard)
   @Post('search-history')
   saveSearchHistory(@Body() body: SaveSearchHistoryBody) {
     return this.hotelsService.saveSearchHistory(body.query);
@@ -70,5 +79,14 @@ export class HotelsController {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 5;
     return this.hotelsService.findReviews(id, pageNum, limitNum);
+  }
+
+  @UseGuards(JwtGuard)
+  @Get('personalized/suggestions')
+  getPersonalizedSuggestions(
+    @GetUser() user: JwtPayload,
+    @Query() query: RecommendationQueryDto,
+  ) {
+    return this.hotelsService.getRecommendations(user.sub, query.limit);
   }
 }
