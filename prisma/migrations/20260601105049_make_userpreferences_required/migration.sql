@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "User" ALTER COLUMN "budgetRange" DROP DEFAULT,
+ALTER COLUMN "groupType" DROP DEFAULT,
+ALTER COLUMN "homeCountry" DROP DEFAULT,
+ALTER COLUMN "preferredActivities" DROP DEFAULT,
+ALTER COLUMN "preferredClimate" DROP DEFAULT,
+ALTER COLUMN "preferredRegions" DROP DEFAULT,
+ALTER COLUMN "travelStyle" DROP DEFAULT;

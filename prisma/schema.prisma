@@ -11,11 +11,57 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Climate {
+  TROPICAL
+  COLD
+  DRY
+  MODERATE
+}
+
+enum TravelStyle {
+  ADVENTURE
+  RELAXATION
+  CULTURAL
+  BUSINESS
+  NIGHTLIFE
+}
+
+enum BudgetRange {
+  BUDGET
+  MID_RANGE
+  LUXURY
+}
+
+enum GroupType {
+  SOLO
+  COUPLE
+  FAMILY
+  FRIENDS
+}
+
 model User {
   id        Int    @id @default(autoincrement())
   email     String @unique
+  password  String 
   firstName String
   lastName  String
+
+  // Preferences
+  preferredClimate     Climate
+  travelStyle          TravelStyle
+  preferredActivities  String[]
+  preferredRegions     String[]
+
+  // Finances
+  budgetRange  BudgetRange
+  currency     String?      @default("USD")
+
+  // Travel Info
+  homeCountry  String
+  groupType    GroupType?
+
+  // Auth
+  refreshToken String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -33,6 +79,7 @@ model Hotel {
   stars         Int
   pricePerNight Float
   image         String?
+  tags          String[] 
 
   reviews HotelReviews[]
   searchHistory HotelSearchHistory[]
