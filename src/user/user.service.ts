@@ -13,4 +13,23 @@ export class UserService {
   async getUser() {
     return this.prismaService.user.findMany();
   }
+
+  async getMe(userId: number) {
+    return this.prismaService.user.findUnique({
+      where: { id: userId },
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        preferredClimate: true,
+        travelStyle: true,
+        preferredActivities: true,
+        preferredRegions: true,
+        budgetRange: true,
+        currency: true,
+        homeCountry: true,
+        groupType: true,
+      },
+    });
+  }
 }

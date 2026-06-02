@@ -4,9 +4,6 @@ export class CreateReviewDto {
   @IsNumber()
   hotelId: number;
 
-  @IsNumber()
-  userId: number;
-
   @IsInt()
   @Min(1)
   @Max(5)
