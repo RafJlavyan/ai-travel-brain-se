@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 
@@ -40,6 +40,42 @@ export class HotelReviewsService {
       });
 
       return newReview;
+    });
+  }
+
+  async deleteReview(userId: number, reviewId: number) {
+    const review = await this.prismaService.hotelReviews.findUnique({
+      where: { id: reviewId },
+    });
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+    if (review.userId !== userId) {
+      throw new ForbiddenException('You can only delete your own reviews');
+    }
+
+    return await this.prismaService.$transaction(async (tx) => {
+      const deleted = await tx.hotelReviews.delete({
+        where: { id: reviewId },
+      });
+
+      const aggregation = await tx.hotelReviews.aggregate({
+        where: { hotelId: review.hotelId },
+        _avg: {
+          rating: true,
+        },
+      });
+
+      const averageRating = aggregation._avg.rating ?? 0;
+
+      await tx.hotel.update({
+        where: { id: review.hotelId },
+        data: {
+          stars: Math.round(averageRating),
+        },
+      });
+
+      return deleted;
     });
   }
 }

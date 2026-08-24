@@ -79,7 +79,6 @@ export class HotelsService {
     return Array.from(suggestions);
   }
 
-  // FIXED: Added transaction isolation and fixed array index property reading crash bug
   async saveSearchHistory(searchQuery?: string) {
     const query = searchQuery?.trim();
     if (!query) return null;
@@ -89,7 +88,6 @@ export class HotelsService {
       select: { id: true },
     });
 
-    // Run actions together inside a atomic transaction context
     return this.prisma.$transaction(async (tx) => {
       const newSearch = await tx.hotelSearchHistory.create({
         data: {
@@ -106,7 +104,6 @@ export class HotelsService {
         select: { createdAt: true },
       });
 
-      // CRITICAL FIX: Evaluated array elements safely via index boundaries [0]
       if (fifthRecord.length > 0) {
         await tx.hotelSearchHistory.deleteMany({
           where: {
@@ -165,33 +162,70 @@ export class HotelsService {
     limit: number = 5,
     currentUserId?: number,
   ) {
-    const skip = (page - 1) * limit;
-
-    const reviewWithRelationsArgs =
-      Prisma.validator<Prisma.HotelReviewsFindManyArgs>()({
-        where: { hotelId },
-        skip: skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
+    // 1. Fetch current user's review if they are logged in
+    let myReview: any = null;
+    if (currentUserId) {
+      myReview = await this.prisma.hotelReviews.findFirst({
+        where: { hotelId, userId: currentUserId },
         include: {
           user: {
             select: { firstName: true, lastName: true, email: true },
           },
-          likes: currentUserId
-            ? { where: { userId: currentUserId }, select: { id: true } }
-            : false,
+          likes: { where: { userId: currentUserId }, select: { id: true } },
           _count: {
             select: { likes: true },
           },
         },
       });
+    }
 
-    const [reviews, totalCount] = await Promise.all([
-      this.prisma.hotelReviews.findMany(reviewWithRelationsArgs),
-      this.prisma.hotelReviews.count({ where: { hotelId } }),
-    ]);
+    // 2. Calculate skip/take for other reviews
+    let skip = (page - 1) * limit;
+    let take = limit;
 
-    const formattedReviews = reviews.map((review) => ({
+    if (myReview) {
+      if (page === 1) {
+        take = limit - 1; // Since we include myReview, take one less
+      } else {
+        skip = (page - 1) * limit - 1; // Shift skip index because myReview was taken on page 1
+      }
+    }
+
+    // 3. Query other reviews (excluding current user's review if it exists)
+    const otherReviews = await this.prisma.hotelReviews.findMany({
+      where: {
+        hotelId,
+        ...(currentUserId ? { NOT: { userId: currentUserId } } : {}),
+      },
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: { firstName: true, lastName: true, email: true },
+        },
+        likes: currentUserId
+          ? { where: { userId: currentUserId }, select: { id: true } }
+          : false,
+        _count: {
+          select: { likes: true },
+        },
+      },
+    });
+
+    // 4. Combine reviews
+    const combinedReviews: any[] = [];
+    if (page === 1 && myReview) {
+      combinedReviews.push(myReview);
+    }
+    combinedReviews.push(...otherReviews);
+
+    // 5. Total count includes all reviews
+    const totalCount = await this.prisma.hotelReviews.count({
+      where: { hotelId },
+    });
+
+    const formattedReviews = combinedReviews.map((review) => ({
       id: review.id,
       rating: review.rating,
       review: review.review,

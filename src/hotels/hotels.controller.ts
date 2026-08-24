@@ -12,6 +12,7 @@ import {
 import { HotelsService } from './hotels.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { GetHotelsFilterDto } from './dto/get-hotels-filter.dto';
+import { OptionalJwtGuard } from 'src/auth/guards/optional-jwt.guard';
 import { JwtGuard } from 'src/auth/guards/jwt.guard';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import type { JwtPayload } from 'src/auth/types/auth.types';
@@ -71,14 +72,16 @@ export class HotelsController {
   }
 
   @Get(':id/reviews')
+  @UseGuards(OptionalJwtGuard)
   getReviews(
     @Param('id', ParseIntPipe) id: number,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @GetUser('sub') currentUserId?: number,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 5;
-    return this.hotelsService.findReviews(id, pageNum, limitNum);
+    return this.hotelsService.findReviews(id, pageNum, limitNum, currentUserId);
   }
 
   @UseGuards(JwtGuard)
